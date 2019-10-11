@@ -1,0 +1,18 @@
+# BUILD
+build:
+  version: @project.version@
+  timestamp: @maven.build.timestamp@
+
+# LOGGING
+logging:
+  config: classpath:logback-spring.xml
+  file: app.log
+
+# SPRING
+spring:
+
+  # ANSI-OUTPUT
+  output.ansi.enabled: ALWAYS
+
+  # JMX
+  jmx.enabled: false

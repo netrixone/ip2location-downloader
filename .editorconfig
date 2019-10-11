@@ -1,0 +1,32 @@
+# EditorConfig is awesome: http://EditorConfig.org
+
+# Top-most EC file
+root = true
+
+# All common code files - basic settings
+[*.{java,xml,html}]
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# All code files - 4 space indentation
+indent_style = space
+indent_size = 4
+
+# Makefile support
+[Makefile]
+indent_style = tab
+
+# editorconfig.org
+root = true
+
+[*.{js,json}]
+indent_size = 2
+indent_style = space
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
