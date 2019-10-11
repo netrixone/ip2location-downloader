@@ -1,4 +1,6 @@
 # IP2Location Downloader
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnetrixone%2Fip2location-downloader.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnetrixone%2Fip2location-downloader?ref=badge_shield)
+
 
 **A microservice that regularly downloads IP2Location dump files with a given period.**
 
@@ -36,3 +38,7 @@ an attempt will be made to create it.
 a [java.time.Duration compliant](https://docs.oracle.com/javase/8/docs/api/java/time/Duration.html?is-external=true#parse-java.lang.CharSequence-)
 - `IP2LOCATION_DOWNLOAD_TYPE [string]` - type of the [IP2Location database](https://www.ip2location.com/database) to download
 - `IP2LOCATION_DOWNLOAD_TOKEN [string]` - IP2Location download token (aka. API key)
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnetrixone%2Fip2location-downloader.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnetrixone%2Fip2location-downloader?ref=badge_large)
