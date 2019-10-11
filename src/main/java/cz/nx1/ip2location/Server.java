@@ -3,6 +3,7 @@ package cz.nx1.ip2location;
 import java.io.IOException;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -24,6 +25,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 @EnableScheduling
 @EnableRetry
 @RequiredArgsConstructor
+@Slf4j
 public class Server {
 
     private final IP2LocationDownloadService downloaderService;
@@ -31,15 +33,23 @@ public class Server {
     @Value("${ip2location.download.type}")
     private String downloadType;
 
+    @Value("${ip2location.download.period}")
+    private DownloadPeriod downloadPeriod;
+
     @Value("${ip2location.download.dir}")
     private Path downloadDir;
 
     /**
      * Downloads the latest IP2Location DB file.
      */
-    @Scheduled(fixedRateString = "${ip2location.download.period}")
+    @Scheduled(cron = "${ip2location.download.cron:0 * * * * *}", zone = "UTC")
     @Retryable(backoff = @Backoff(delay = 60000, multiplier = 5))
     public void runDownload() throws IOException {
+        if (downloaderService.isDownloaded(downloadType).in(downloadDir).during(downloadPeriod)) {
+            LOG.debug("Download is not needed.");
+            return;
+        }
+
         downloaderService.download(downloadType).to(downloadDir);
     }
 

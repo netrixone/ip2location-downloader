@@ -3,6 +3,7 @@ package cz.nx1.ip2location;
 import java.io.File;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -30,13 +31,13 @@ public class HttpClientTest {
         Files.write(sourceFile.toPath(), "dummy content".getBytes());
 
         URL source = sourceFile.toURI().toURL();
-        File destination = tempDir.newFile("destination");
+        Path destination = tempDir.newFile("destination").toPath();
 
         // When:
         HttpClient httpClient = new HttpClient();
         httpClient.download(source, destination);
 
         // Then:
-        assertThat(Files.readAllLines(destination.toPath()), contains("dummy content"));
+        assertThat(Files.readAllLines(destination), contains("dummy content"));
     }
 }

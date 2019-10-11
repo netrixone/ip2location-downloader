@@ -1,16 +1,20 @@
 package cz.nx1.ip2location;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
+import java.util.TimeZone;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import static java.nio.file.Files.deleteIfExists;
+import static java.nio.file.Files.exists;
+import static java.nio.file.Files.isDirectory;
+import static java.nio.file.Files.isWritable;
+import static java.nio.file.Files.list;
+import static java.nio.file.Files.size;
 
 /**
  * Service for downloading IP2Location dumps.
@@ -28,28 +32,114 @@ public class IP2LocationDownloadService {
 
     private final String downloadToken;
 
+    /**
+     * Creates a new IP2LocationDownloadService using a given {@code httpClient}
+     * and {@code downloadToken}.
+     */
     public IP2LocationDownloadService(HttpClient httpClient, @Value("${ip2location.download.token}") String downloadToken) {
         this.httpClient = httpClient;
         this.downloadToken = downloadToken;
     }
 
     /**
-     * Prepares a download of the latest DB of a given {@code dbType} from IP2Location API.
+     * Checks if an IP2Location DB of a given {@code type} has been downloaded.
      */
-    public IP2LocationDownload download(String dbType) {
-        if (!dbType.matches("(DB|PX)[0-9]{1,2}")) {
-            throw new IllegalArgumentException(String.format("Invalid database type requested: '%s'.", dbType));
-        }
-        return new IP2LocationDownload(dbType);
+    public DownloadCheckBuilder isDownloaded(String type) {
+        return new DownloadCheck(type);
     }
 
-    @AllArgsConstructor(access = AccessLevel.PROTECTED)
-    protected class IP2LocationDownload {
+    /**
+     * Prepares a download of the latest DB of a given {@code type} from IP2Location API.
+     */
+    public Download download(String type) {
+        return new Download(type);
+    }
 
-        private final String dbType;
+    /**
+     * Builder step interface for a download check.
+     */
+    protected interface DownloadCheckBuilder {
 
         /**
-         * Downloads the latest DB from IP2Location API to a file in a given {@code downloadDir} and returns it.
+         * Checks if an IP2Location DB has been downloaded in a given {@code dir}.
+         */
+        DownloadCheck in(Path dir);
+    }
+
+    /**
+     * Download check implementation.
+     */
+    protected class DownloadCheck implements DownloadCheckBuilder {
+
+        private String downloadType;
+        private Path downloadDir;
+
+        protected DownloadCheck(String type) {
+            this.downloadType = type;
+        }
+
+        @Override
+        public DownloadCheck in(Path dir) {
+            this.downloadDir = dir;
+            return this;
+        }
+
+        /**
+         * Checks if an IP2Location DB has been downloaded during a given {@code period}.
+         */
+        public boolean during(DownloadPeriod period) {
+            boolean recentFileExists;
+
+            SimpleDateFormat dateFormat;
+            switch (period) {
+                case HOUR:
+                    dateFormat = new SimpleDateFormat("yyyyMMdd-HH");
+                    break;
+
+                case DAY:
+                    dateFormat = new SimpleDateFormat("yyyyMMdd-");
+                    break;
+
+                case MONTH:
+                    dateFormat = new SimpleDateFormat("yyyyMM");
+                    break;
+
+                default:
+                    throw new IllegalStateException("Download period '%s' is not supported.");
+            }
+            dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            String filePrefix = String.format("IP2LOCATION_%s_%s", downloadType, dateFormat.format(new Date()));
+            String fileSuffix = ".zip";
+
+            try {
+                recentFileExists = list(downloadDir)
+                    .filter(file -> file.getFileName().toString().startsWith(filePrefix))
+                    .filter(file -> file.getFileName().toString().endsWith(fileSuffix))
+                    .anyMatch(entry -> entry.toFile().length() > 0);
+            } catch (IOException e) {
+                // Cannot read the dir: file does not exists -> eat.
+                recentFileExists = false;
+            }
+
+            return recentFileExists;
+        }
+    }
+
+    /**
+     * Download implementation.
+     */
+    protected class Download {
+
+        private final String downloadType;
+
+        public Download(String type) {
+            validateDownloadType(type);
+            this.downloadType = type;
+        }
+
+        /**
+         * Downloads the latest DB from IP2Location API to a file in a given {@code dir} and returns it.
          * <p>
          * The downloaded dump file is named using a following pattern:
          * {@code "IP2LOCATION_TYPE_yyyyMMdd-HHmmss.SSSS.csv"}.
@@ -58,41 +148,49 @@ public class IP2LocationDownloadService {
          *
          * @throws IOException if an I/O exception occurs
          */
-        public File to(Path downloadDir) throws IOException {
-            File destinationDir = downloadDir.toFile();
-            if (destinationDir.exists()) {
-                if (!destinationDir.isDirectory()) {
-                    throw new IllegalArgumentException(String.format("Given dir '%s' is not a directory.", destinationDir));
-                } else if (!destinationDir.canWrite()) {
-                    throw new IllegalArgumentException(String.format("Given dir '%s' is not writable.", destinationDir));
+        public Path to(Path dir) throws IOException {
+            if (exists(dir)) {
+                if (!isDirectory(dir)) {
+                    throw new IllegalArgumentException(String.format("Given dir '%s' is not a directory.", dir));
+                } else if (!isWritable(dir)) {
+                    throw new IllegalArgumentException(String.format("Given dir '%s' is not writable.", dir));
                 }
-            } else if ( !destinationDir.mkdirs()) {
-                throw new IllegalArgumentException(String.format("Could not create dir '%s'.", destinationDir));
+            } else if (!dir.toFile().mkdirs()) {
+                throw new IllegalArgumentException(String.format("Could not create dir '%s'.", dir));
             }
 
-            File destination = createDestinationFile(dbType, destinationDir);
-            if (destination.exists() && (!destination.canWrite() || !destination.delete())) {
+            Path destination = createDestinationFile(downloadType, dir);
+            if (exists(destination) && !deleteIfExists(destination)) {
                 throw new IllegalArgumentException(String.format("Could not delete file '%s'.", destination));
             }
 
-            LOG.info("Downloading IP2Location '{}' to '{}'.", dbType, destination.getAbsolutePath());
+            LOG.info("Downloading IP2Location '{}' to '{}'.", downloadType, destination);
 
-            URL dumpUrl = new URL("https://www.ip2location.com/download?token=" + downloadToken + "&file=" + dbType);
+            URL dumpUrl = new URL("https://www.ip2location.com/download?token=" + downloadToken + "&file=" + downloadType);
             httpClient.download(dumpUrl, destination);
 
             // Check what we've received.
-            if (destination.length() == 0) {
+            if (!exists(destination) || size(destination) == 0) {
                 // Maybe just try again later.
                 throw new IllegalStateException("Downloaded dump is empty.");
             }
 
+            LOG.info("Download finished ({} B).", size(destination));
+
             return destination;
         }
 
-        protected File createDestinationFile(String dbType, File parentDir) {
+        protected void validateDownloadType(String downloadType) {
+            if (!downloadType.matches("(DB|PX)[0-9]{1,2}")) {
+                throw new IllegalArgumentException(String.format("Invalid database type requested: '%s'.", downloadType));
+            }
+        }
+
+        protected Path createDestinationFile(String dbType, Path parentDir) {
             SimpleDateFormat fileNameFormat = new SimpleDateFormat(FILE_NAME_DATE_PATTERN);
+            fileNameFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
             String fileName = String.format("IP2LOCATION_%s_%s.zip", dbType, fileNameFormat.format(new Date()));
-            return new File(parentDir, fileName);
+            return parentDir.resolve(fileName);
         }
     }
 }

@@ -26,7 +26,7 @@ mvn clean install
 
 ```bash
 $ IP2LOCATION_DOWNLOAD_DIR=/tmp \
-  IP2LOCATION_DOWNLOAD_PERIOD=P1D \
+  IP2LOCATION_DOWNLOAD_FREQUENCY=MONTH \
   IP2LOCATION_DOWNLOAD_TYPE=DB1 \
   IP2LOCATION_DOWNLOAD_TOKEN=1234-4567-abc \
   java -jar target/ip2location-1.0-SNAPSHOT.jar
@@ -36,7 +36,7 @@ $ IP2LOCATION_DOWNLOAD_DIR=/tmp \
 
 - `IP2LOCATION_DOWNLOAD_DIR [string]` - a dir where the dumps will get downloaded to. If the dir does not exist,
 an attempt will be made to create it.
-- `IP2LOCATION_DOWNLOAD_PERIOD [string|number]` - time period for download to start in milliseconds or 
-a [java.time.Duration compliant](https://docs.oracle.com/javase/8/docs/api/java/time/Duration.html?is-external=true#parse-java.lang.CharSequence-) value
+- `IP2LOCATION_DOWNLOAD_PERIOD [HOUR|DAY|MOTH]` - the frequency of download
 - `IP2LOCATION_DOWNLOAD_TYPE [string]` - type of the [IP2Location database](https://www.ip2location.com/database) to download
 - `IP2LOCATION_DOWNLOAD_TOKEN [string]` - IP2Location download token (aka. API key)
+- `IP2LOCATION_DOWNLOAD_CRON [string|number] = 0 * * * * *` - [cron-like expression](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Scheduled.html#cron--) (in UTC time zone) when the download check kicks in
